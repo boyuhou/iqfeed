@@ -80,4 +80,6 @@ def get_instruments_from_file(filename):
     with open(filename, 'r') as f:
         for instrument in f:
             instruments.append(instrument.rstrip())
+    if len(instruments) > 0:
+        instruments = instruments[1:]
     return instruments
