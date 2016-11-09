@@ -33,7 +33,7 @@ def retry(tries, exceptions=None, delay=0):
     exceptions -- exceptions to catch
     delay -- wait between retries
     """
-    exceptions_ = exceptions or (Exception, )
+    exceptions = exceptions or (Exception, )
 
     def _retry(fn):
         @wraps(fn)
@@ -41,7 +41,7 @@ def retry(tries, exceptions=None, delay=0):
             for _ in xrange(tries+1):
                 try:
                     return fn(*args, **kwargs)
-                except exceptions_, e:
+                except exceptions as e:
                     log.warning("Exception, retrying...", exc_info=e)
                     time.sleep(delay)
             raise # If no success after tries raise last exception

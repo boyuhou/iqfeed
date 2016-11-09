@@ -85,7 +85,7 @@ def get_bars(instrument, start_date, end_date, tz, seconds_per_bar,
     #   [second per data point].
     #
     # Source: https://github.com/bwlewis/iqfeed/blob/master/man/HIT.Rd
-    begin_time_filter = '093000'
+    begin_time_filter = '092900'
     end_time_filter = '160000'
     historical_data_request = "HIT,%s,%s,%s,%s,,%s,%s,1\n" % (instrument, seconds_per_bar, start_date, end_date,
                                                               begin_time_filter, end_time_filter)

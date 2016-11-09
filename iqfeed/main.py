@@ -65,14 +65,13 @@ eastern_tz = 'US/Eastern'
 @click.option('--outdir', default=None, help='Output folder')
 @click.option('--start_date', default='20140101', help='Start date default to 20140101')
 @click.option('--end_date', default=today_str, help='End date')
-@click.option('--group', default=None, help='ETF, STOCK or None')
 @click.option('--debug', default=False, help='True or False to introduce debug mode')
 @click.option('--universe', default=None, help='The file that contains the universe')
 @click.option('--iqfeed_host', default='localhost', help='IQFeed Host default localhost')
 @click.option('--iqfeed_port', default=9100, help='IQFeed Port, default 9100')
 @click.option('--timezone', default=eastern_tz, help='Timezone, default US/Eastern')
 @click.option('--seconds_per_bar', default=60, help='bar per seconds, default 60')
-def main(ticker, outdir, start_date, end_date, group, debug, universe, iqfeed_host, iqfeed_port, timezone, seconds_per_bar):
+def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqfeed_port, timezone, seconds_per_bar):
     log = logging.getLogger()
     log_console = logging.StreamHandler(sys.stdout)
     log.setLevel(logging.DEBUG if debug else logging.INFO)
@@ -81,23 +80,23 @@ def main(ticker, outdir, start_date, end_date, group, debug, universe, iqfeed_ho
 
     if ticker is not None:
         instruments = (ticker, )
-    elif group is not None and universe is not None:
+    elif universe is not None:
         instruments = get_instruments_from_file(universe)
     else:
-        raise NotImplementedError('No ticker or group/universe is specified. Not sure what to do.')
+        raise NotImplementedError('No ticker or universe is specified. Not sure what to do.')
 
     tz = pytz.timezone(timezone)
 
     for (i, instrument) in enumerate(instruments):
         try:
-            log.info(str.format("Processing %s (%d out of %d)", instrument, i+1, len(instruments)))
+            log.info(str.format("Processing {0} ({1} out of {2})", instrument, i+1, len(instruments)))
 
-            instrument_path = os.path.combine(outdir, instrument+'.csv')
+            instrument_path = os.path.join(outdir, instrument+'.csv')
             price_df = pd.DataFrame()
             if os.path.exists(instrument_path):
                 price_df = pd.read_csv(instrument_path, index_col=0, parse_dates=True)
                 last_date = price_df.index[-1].date()
-                start_date = last_date + timedelta(days=1).strftime('%Y%m%d')
+                start_date = (last_date + timedelta(days=1)).strftime('%Y%m%d')
 
             if int(start_date) > int(end_date):
                 log.info('Price already in place.')
@@ -105,7 +104,7 @@ def main(ticker, outdir, start_date, end_date, group, debug, universe, iqfeed_ho
                 bars = get_bars(instrument, start_date, end_date, tz, seconds_per_bar, iqfeed_host, iqfeed_port)
                 if len(bars):
                     new_df = bars_to_dateframe(bars, tz)
-                    pd.concat([price_df, new_df]).to_csv(instrument_path)
+                    pd.concat([price_df, new_df])[['Open', 'High', 'Low', 'Close', 'Volume']].to_csv(instrument_path, date_format='%Y%m%d %H%M%S')
 
         except Exception as e:
             log.error('Exception during download, continuing', exc_info=e)
