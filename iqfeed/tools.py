@@ -18,8 +18,7 @@
 from functools import wraps
 import logging
 import time
-import csv
-import os
+import pandas as pd
 
 
 log = logging.getLogger(__name__)
@@ -51,27 +50,17 @@ def retry(tries, exceptions=None, delay=0):
     return _retry
 
 
-def write_bars_to_file(bars, filename, tz):
-    """Creates CSV file from list of Bar instances"""
-    date_format_str = "%Y%m%d %H%M%S"
+def bars_to_dateframe(bars, tz):
+    """Creates dataframe from list of Bar instances"""
 
-    rows = [{'DateTime':  bar.datetime.astimezone(tz).strftime(date_format_str),
+    rows = [{'DateTime':  bar.datetime.astimezone(tz),
              'Open':	  bar.open,
              'High':	  bar.high,
              'Low':	      bar.low,
              'Close':	  bar.close,
              'Volume':	  bar.volume,
              } for bar in bars]
-
-    if os.path.exists(filename):
-        raise Exception("File already exists!")
-
-    fd = os.popen("gzip > %s" % filename, 'w') if filename.endswith('.gz') else open(filename, 'w')
-
-    with fd:
-        csv_writer = csv.DictWriter(fd, ['DateTime', 'Open', 'High', 'Low', 'Close', 'Volume'])
-        csv_writer.writeheader()
-        csv_writer.writerows(rows)
+    return pd.DataFrame.from_records(rows).set_index(['DateTime']).sort_index()
 
 
 def get_instruments_from_file(filename):

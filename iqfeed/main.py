@@ -25,6 +25,8 @@ Usage:
   iqfeed download <instrument> <start_year> <end_year> [-d DIR] [-i CON] [-t TZ] [-D]
   iqfeed -h | --help
 
+  iqfeed --start_date 20150101 --end_date 2016101 --ticker AAPL --outdir 'C:\\temp' --seconds_per_bar 60
+
 Commands:
   download            Download the specified instrument
   get-from-file       Download instruments listed in the specified file
@@ -45,54 +47,65 @@ Date format for end_date and start_date: YYYYMMDD
 import os
 import sys
 import logging
-
-import docopt
 import pytz
+import click
+import pandas as pd
+from datetime import datetime, timedelta
 
 from .download import get_bars
-from .tools import get_instruments_from_file, write_bars_to_file
+from .tools import get_instruments_from_file, bars_to_dateframe
+
+today = datetime.now().today()
+today_str = today.strftime('%Y%m%d')
+eastern_tz = 'US/Eastern'
 
 
-def main():
-    args = docopt.docopt(__doc__, argv=sys.argv[1:], version=0.4)
-
+@click.command()
+@click.option('--ticker', default=None, help='Ticker Symbol')
+@click.option('--outdir', default=None, help='Output folder')
+@click.option('--start_date', default='20140101', help='Start date default to 20140101')
+@click.option('--end_date', default=today_str, help='End date')
+@click.option('--group', default=None, help='ETF, STOCK or None')
+@click.option('--debug', default=False, help='True or False to introduce debug mode')
+@click.option('--universe', default=None, help='The file that contains the universe')
+@click.option('--iqfeed_host', default='localhost', help='IQFeed Host default localhost')
+@click.option('--iqfeed_port', default=9100, help='IQFeed Port, default 9100')
+@click.option('--timezone', default=eastern_tz, help='Timezone, default US/Eastern')
+@click.option('--seconds_per_bar', default=60, help='bar per seconds, default 60')
+def main(ticker, outdir, start_date, end_date, group, debug, universe, iqfeed_host, iqfeed_port, timezone, seconds_per_bar):
     log = logging.getLogger()
     log_console = logging.StreamHandler(sys.stdout)
-    log.setLevel(logging.DEBUG if args['-D'] else logging.INFO)
-    log_console.setLevel(logging.DEBUG if args['-D'] else logging.INFO)
+    log.setLevel(logging.DEBUG if debug else logging.INFO)
+    log_console.setLevel(logging.DEBUG if debug else logging.INFO)
     log.addHandler(log_console)
 
-    if args['download']:
-        instruments = (args['<instrument>'], )
-    elif args['process-file']:
-        instruments = get_instruments_from_file(args['<filename>'])
+    if ticker is not None:
+        instruments = (ticker, )
+    elif group is not None and universe is not None:
+        instruments = get_instruments_from_file(universe)
+    else:
+        raise NotImplementedError('No ticker or group/universe is specified. Not sure what to do.')
 
-    start_year = int(args['<start_year>'])
-    end_year = int(args['<end_year>'])
-    iqfeed_host, iqfeed_port = args['--iqfeed'].split(':')
-    iqfeed_port = int(iqfeed_port)
-    tz = pytz.timezone(args['--tz'])
-    download_dir = args['--download-dir']
-    seconds_per_bar = 60  # 1M data
+    tz = pytz.timezone(timezone)
 
     for (i, instrument) in enumerate(instruments):
         try:
-            log.info("Processing %s (%d out of %d)", instrument, i+1, len(instruments))
+            log.info(str.format("Processing %s (%d out of %d)", instrument, i+1, len(instruments)))
 
-            for year in range(start_year, end_year+1):
-                filename = '%s/HC-%s-1M-%d-iqfeed.csv.gz' % (download_dir, instrument, year)
-                start_date = '%s0101' % year
-                end_date = '%s1231' % year
+            instrument_path = os.path.combine(outdir, instrument+'.csv')
+            price_df = pd.DataFrame()
+            if os.path.exists(instrument_path):
+                price_df = pd.read_csv(instrument_path, index_col=0, parse_dates=True)
+                last_date = price_df.index[-1].date()
+                start_date = last_date + timedelta(days=1).strftime('%Y%m%d')
 
-                if os.path.exists(filename):
-                    log.info('File already exists: %s', filename)
-                    continue
-                else:
-                    log.info('Downloading to %s', filename)
-
+            if int(start_date) > int(end_date):
+                log.info('Price already in place.')
+            else:
                 bars = get_bars(instrument, start_date, end_date, tz, seconds_per_bar, iqfeed_host, iqfeed_port)
                 if len(bars):
-                    write_bars_to_file(bars, filename, tz)
+                    new_df = bars_to_dateframe(bars, tz)
+                    pd.concat([price_df, new_df]).to_csv(instrument_path)
 
         except Exception as e:
             log.error('Exception during download, continuing', exc_info=e)
