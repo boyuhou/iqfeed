@@ -71,7 +71,7 @@ def __create_datetime(datetime_str, format_str, timezone):
 
 @retry(5, delay=2)
 def get_bars(instrument, start_date, end_date, tz, seconds_per_bar,
-             iqfeed_host='localhost', iqfeed_port=9100, timeout=5.0):
+             iqfeed_host='localhost', iqfeed_port=9100, timeout=10.0):
     """
     Returns list of Bar instances for the given instrument, time period, time zone and bar frequency (second_per_bar).
     The function is retried 5 times in 5 second intervals to alleviate IQFeed daemon's glitches.

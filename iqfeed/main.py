@@ -93,15 +93,16 @@ def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqf
 
             instrument_path = os.path.join(outdir, instrument+'.csv')
             price_df = pd.DataFrame()
+            process_start_date = start_date
             if os.path.exists(instrument_path):
                 price_df = pd.read_csv(instrument_path, index_col=0, parse_dates=True)
                 last_date = price_df.index[-1].date()
-                start_date = (last_date + timedelta(days=1)).strftime('%Y%m%d')
+                process_start_date = (last_date + timedelta(days=1)).strftime('%Y%m%d')
 
-            if int(start_date) > int(end_date):
+            if int(process_start_date) > int(end_date):
                 log.info('Price already in place.')
             else:
-                bars = get_bars(instrument, start_date, end_date, tz, seconds_per_bar, iqfeed_host, iqfeed_port)
+                bars = get_bars(instrument, process_start_date, end_date, tz, seconds_per_bar, iqfeed_host, iqfeed_port)
                 if len(bars):
                     new_df = bars_to_dateframe(bars, tz)
                     pd.concat([price_df, new_df])[['Open', 'High', 'Low', 'Close', 'Volume']].to_csv(instrument_path, date_format='%Y%m%d %H%M%S')
