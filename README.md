@@ -7,7 +7,9 @@ This project provides command line tool and Python library to access DTN / IQFee
  * IQFeed client (e.g. [bratchenko's 'iqfeed-docker'](https://github.com/bratchenko/docker-iqfeed))
 
 ## Installation
-`$ pip install iqfeed`
+`$ pip uninstall iqfeed`
+`$ python setup.py bdist_wheel`
+`$ pip install iqfeed --no-index --find-links dist`
 
 ## Usage from command line
 The provided `iqfeed` utility can be used to download CSV files from DTN / IQFeed.

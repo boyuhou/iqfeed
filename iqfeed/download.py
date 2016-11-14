@@ -85,12 +85,12 @@ def get_bars(instrument, start_date, end_date, tz, seconds_per_bar,
     #   [second per data point].
     #
     # Source: https://github.com/bwlewis/iqfeed/blob/master/man/HIT.Rd
-    begin_time_filter = '092900'
+    begin_time_filter = '093000'
     end_time_filter = '160000'
     historical_data_request = "HIT,%s,%s,%s,%s,,%s,%s,1\n" % (instrument, seconds_per_bar, start_date, end_date,
                                                               begin_time_filter, end_time_filter)
 
-    log.debug("IQFeed historical data request: %s", historical_data_request.rstrip())
+    log.info("IQFeed historical data request: %s", historical_data_request.rstrip())
 
     # Open a streaming socket to the IQFeed daemon
     with contextlib.closing(socket.create_connection((iqfeed_host, iqfeed_port))) as iqfeed_socket:
