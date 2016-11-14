@@ -58,7 +58,7 @@ from .tools import get_instruments_from_file, bars_to_dateframe
 today = datetime.now().today()
 today_str = today.strftime('%Y%m%d')
 eastern_tz = 'US/Eastern'
-
+datetime_format='%Y%m%d %H%M%S'
 
 @click.command()
 @click.option('--ticker', default=None, help='Ticker Symbol')
@@ -71,7 +71,9 @@ eastern_tz = 'US/Eastern'
 @click.option('--iqfeed_port', default=9100, help='IQFeed Port, default 9100')
 @click.option('--timezone', default=eastern_tz, help='Timezone, default US/Eastern')
 @click.option('--seconds_per_bar', default=60, help='bar per seconds, default 60')
-def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqfeed_port, timezone, seconds_per_bar):
+@click.option('--delete_date', default=None, help='Remove data from YYYYMMDD onward based on ticker or universe')
+def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqfeed_port, timezone, seconds_per_bar,
+         delete_date):
     log = logging.getLogger()
     log_console = logging.StreamHandler(sys.stdout)
     log.setLevel(logging.DEBUG if debug else logging.INFO)
@@ -84,6 +86,16 @@ def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqf
         instruments = get_instruments_from_file(universe)
     else:
         raise NotImplementedError('No ticker or universe is specified. Not sure what to do.')
+
+    if delete_date is not None:
+        for (i, instrument) in enumerate(instruments):
+            log.info('Deleting {0} data after {1}, {2} out of {3}', instrument, i+1, len(instruments))
+            instrument_path = os.path.join(outdir, instrument+'.csv')
+            if not os.path.exists(instrument_path):
+                raise Exception('Path Not Found. Check if the price data is :{0}'.format(instrument_path))
+            price_df = pd.read_csv(instrument_path, index_col=0, parse_dates=True)
+            price_df.loc[price_df.index <= pd.to_datetime(delete_date)].to_csv(instrument_path,
+                                                                               date_format=datetime_format)
 
     tz = pytz.timezone(timezone)
 
@@ -105,7 +117,7 @@ def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqf
                 bars = get_bars(instrument, process_start_date, end_date, tz, seconds_per_bar, iqfeed_host, iqfeed_port)
                 if len(bars):
                     new_df = bars_to_dateframe(bars, tz)
-                    pd.concat([price_df, new_df])[['Open', 'High', 'Low', 'Close', 'Volume']].to_csv(instrument_path, date_format='%Y%m%d %H%M%S')
+                    pd.concat([price_df, new_df])[['Open', 'High', 'Low', 'Close', 'Volume']].to_csv(instrument_path, date_format=datetime_format)
 
         except Exception as e:
             log.error('Exception during download, continuing', exc_info=e)
