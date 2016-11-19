@@ -53,7 +53,7 @@ def retry(tries, exceptions=None, delay=0):
 def bars_to_dateframe(bars, tz):
     """Creates dataframe from list of Bar instances"""
 
-    rows = [{'DateTime':  bar.datetime.astimezone(tz),
+    rows = [{'DateTime':  bar.datetime,
              'Open':	  bar.open,
              'High':	  bar.high,
              'Low':	      bar.low,

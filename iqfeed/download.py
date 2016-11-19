@@ -16,7 +16,6 @@
 # under the License.
 
 import socket
-import contextlib
 from collections import namedtuple
 from datetime import datetime
 import logging
@@ -29,6 +28,29 @@ log = logging.getLogger(__name__)
 
 Bar = namedtuple('IQFeedBar', ['datetime', 'open', 'high', 'low', 'close', 'volume'])
 
+
+def _read_historical_data_socket(sock, recv_buffer=4096):
+    """
+    Read the information from the socket, in a buffered
+    fashion, receiving only 4096 bytes at a time.
+
+    Parameters:
+    sock - The socket object
+    recv_buffer - Amount in bytes to receive per read
+    """
+    buffer = ""
+    data = ""
+    while True:
+        data = sock.recv(recv_buffer)
+        buffer += data
+
+        # Check if the end message string arrives
+        if "!ENDMSG!" in buffer:
+            break
+
+    # Remove the end message string
+    buffer = buffer[:-12]
+    return buffer
 
 def __download_historical_data(iqfeed_socket, chunk_size=65535):
     """
@@ -62,15 +84,16 @@ def __download_historical_data(iqfeed_socket, chunk_size=65535):
 
 
 @lru_cache(maxsize=780000)  # 10 years worth of datetimes
-def __create_datetime(datetime_str, format_str, timezone):
+def __create_datetime(datetime_str, format_str):
     # It takes a reasonable amount of time to construct the datetime fields with timezone info.
     # This function is used to cache the datetime object results.
     dt = datetime.strptime(datetime_str, format_str)
-    return timezone.localize(dt)
+    # return timezone.localize(dt)
+    return dt
 
 
 @retry(5, delay=2)
-def get_bars(instrument, start_date, end_date, tz, seconds_per_bar,
+def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
              iqfeed_host='localhost', iqfeed_port=9100, timeout=10.0):
     """
     Returns list of Bar instances for the given instrument, time period, time zone and bar frequency (second_per_bar).
@@ -87,18 +110,34 @@ def get_bars(instrument, start_date, end_date, tz, seconds_per_bar,
     # Source: https://github.com/bwlewis/iqfeed/blob/master/man/HIT.Rd
     begin_time_filter = '093000'
     end_time_filter = '160000'
-    historical_data_request = "HIT,%s,%s,%s,%s,,%s,%s,1\n" % (instrument, seconds_per_bar, start_date, end_date,
-                                                              begin_time_filter, end_time_filter)
+    historical_minute_data_request = 'HIT,{0},{1},{2},{3},,{4},{5},1\n'.format(instrument, seconds_per_bar,
+                                                                               start_date, end_date, begin_time_filter, end_time_filter)
+    historical_daily_data_request = 'HDT,{0},{1},{2},,,,1\n'.format(instrument, start_date, end_date)
+    # historical_minute_data_request = 'HTX.{0},30,,,1\n'.format(instrument)
 
-    log.info("IQFeed historical data request: %s", historical_data_request.rstrip())
-
+    if freq == 'minute':
+        log.info("IQFeed historical data request: %s", historical_minute_data_request.rstrip())
+    elif freq == 'daily':
+        log.info("IQFeed historical data request: %s", historical_daily_data_request.rstrip())
     # Open a streaming socket to the IQFeed daemon
-    with contextlib.closing(socket.create_connection((iqfeed_host, iqfeed_port))) as iqfeed_socket:
-        iqfeed_socket.settimeout(timeout)
+    # with contextlib.closing(socket.create_connection((iqfeed_host, iqfeed_port))) as iqfeed_socket:
+    #     iqfeed_socket.settimeout(timeout)
+    #
+    #     # Send the historical data request historical_minute_data_request and buffer the data
+    #     iqfeed_socket.sendall(historical_minute_data_request)
+    #     data = __download_historical_data(iqfeed_socket)
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((iqfeed_host, iqfeed_port))
 
-        # Send the historical data request historical_data_request and buffer the data
-        iqfeed_socket.sendall(historical_data_request)
-        data = __download_historical_data(iqfeed_socket)
+        sock.settimeout(timeout)
+        if freq == 'minute':
+            sock.sendall(historical_minute_data_request)
+        elif freq == 'daily':
+            sock.sendall(historical_daily_data_request)
+        data = _read_historical_data_socket(sock)
+    finally:
+        sock.close()
 
     bars = []
     if len(data):
@@ -109,7 +148,11 @@ def get_bars(instrument, start_date, end_date, tz, seconds_per_bar,
                 raise Exception("Float as a volume, strange...: %s" % line)
 
             log.debug("%s open=%s high=%s low=%s close=%s volumes=%s", datetime_str, high, low, open_, close, volume)
-            dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S", timezone=tz)
+            if freq == 'minute':
+                dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S")
+            elif freq == 'daily':
+                dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S").date()
+
             (open_, high, low, close, volume) = (float(open_), float(high), float(low), float(close), int(volume))
 
             bar = Bar(dt, float(open_), float(high), float(low), float(close), int(volume))
