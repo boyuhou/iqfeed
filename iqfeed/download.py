@@ -143,7 +143,15 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
     if len(data):
         for line in data.split('\n'):
             # Returned fields in data are: datetime, high, low, open, close, volume, XXX?, YYYY?
-            (datetime_str, high, low, open_, close, volume, _, _) = line.split(',')
+            log.debug(line)
+            try:
+                (datetime_str, high, low, open_, close, volume, _, _) = line.split(',')
+            except ValueError:
+                if 'NO_DATA' in line:
+                    log.info('Latest Price, no action required')
+                    return []
+                else:
+                    raise
             if volume.find('.') != -1:
                 raise Exception("Float as a volume, strange...: %s" % line)
 
