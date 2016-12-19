@@ -139,6 +139,8 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
         elif freq == 'daily':
             sock.sendall(historical_daily_data_request)
         elif freq == 'tick':
+            historical_tick_data_request = 'HIT,GOOG,2,20160809 155500,20160812 093059,,,,1,,2,t\n'
+            log.debug('tick request: ' + historical_tick_data_request)
             sock.sendall(historical_tick_data_request)
         data = _read_historical_data_socket(sock)
     finally:
@@ -160,9 +162,9 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
             if volume.find('.') != -1:
                 raise Exception("Float as a volume, strange...: %s" % line)
 
-            log.debug("%s open=%s high=%s low=%s close=%s volumes=%s", datetime_str, high, low, open_, close, volume)
+            #log.debug("%s open=%s high=%s low=%s close=%s volumes=%s", datetime_str, high, low, open_, close, volume)
             if freq == 'tick':
-                dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S.%f")
+                dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S")
             elif freq == 'minute':
                 dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S")
             elif freq == 'daily':
