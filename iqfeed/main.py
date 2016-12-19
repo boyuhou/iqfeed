@@ -127,7 +127,10 @@ def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqf
                     new_df = bars_to_dateframe(bars, tz)
                     pd.concat([price_df, new_df])[['Open', 'High', 'Low', 'Close', 'Volume']].to_csv(instrument_path, date_format=date_format)
             elif freq == 'tick':
-                raise NotImplementedError('Havent implemented tick request yet')
+                bars = get_bars(freq, instrument, process_start_date, end_date, tz, seconds_per_bar, iqfeed_host, iqfeed_port)
+                if len(bars):
+                    new_df = bars_to_dateframe(bars, tz)
+                    pd.concat([price_df, new_df])[['Open', 'High', 'Low', 'Close', 'Volume']].to_csv(instrument_path, date_format=datetime_milli_format)
             else:
                 raise TypeError('The freq param is not in a predefined mode')
 

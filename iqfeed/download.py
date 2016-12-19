@@ -113,12 +113,15 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
     historical_minute_data_request = 'HIT,{0},{1},{2},{3},,{4},{5},1\n'.format(instrument, seconds_per_bar,
                                                                                start_date, end_date, begin_time_filter, end_time_filter)
     historical_daily_data_request = 'HDT,{0},{1},{2},,,,1\n'.format(instrument, start_date, end_date)
+    historical_tick_data_request = 'HTT,{0},{1},{2},,{3},{4},1,,\n'.format(instrument, start_date, end_date, begin_time_filter, end_time_filter)
     # historical_minute_data_request = 'HTX.{0},30,,,1\n'.format(instrument)
 
     if freq == 'minute':
         log.info("IQFeed historical data request: %s", historical_minute_data_request.rstrip())
     elif freq == 'daily':
         log.info("IQFeed historical data request: %s", historical_daily_data_request.rstrip())
+    elif freq == 'tick':
+        log.info("IQFeed historical data request: %s", historical_tick_data_request.rstrip())
     # Open a streaming socket to the IQFeed daemon
     # with contextlib.closing(socket.create_connection((iqfeed_host, iqfeed_port))) as iqfeed_socket:
     #     iqfeed_socket.settimeout(timeout)
@@ -135,6 +138,8 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
             sock.sendall(historical_minute_data_request)
         elif freq == 'daily':
             sock.sendall(historical_daily_data_request)
+        elif freq == 'tick':
+            sock.sendall(historical_tick_data_request)
         data = _read_historical_data_socket(sock)
     finally:
         sock.close()
@@ -156,7 +161,9 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
                 raise Exception("Float as a volume, strange...: %s" % line)
 
             log.debug("%s open=%s high=%s low=%s close=%s volumes=%s", datetime_str, high, low, open_, close, volume)
-            if freq == 'minute':
+            if freq == 'tick':
+                dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S.%f")
+            elif freq == 'minute':
                 dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S")
             elif freq == 'daily':
                 dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S").date()
