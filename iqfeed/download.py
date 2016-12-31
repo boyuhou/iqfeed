@@ -27,7 +27,7 @@ from .tools import retry
 log = logging.getLogger(__name__)
 
 Bar = namedtuple('IQFeedBar', ['datetime', 'open', 'high', 'low', 'close', 'volume'])
-
+TickBar = namedtuple('IQFeedTickBar', ['datetime', 'last', 'last_size', 'volume', 'bid', 'ask', 'ticket_id'])
 
 def _read_historical_data_socket(sock, recv_buffer=4096):
     """
@@ -113,12 +113,15 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
     historical_minute_data_request = 'HIT,{0},{1},{2},{3},,{4},{5},1\n'.format(instrument, seconds_per_bar,
                                                                                start_date, end_date, begin_time_filter, end_time_filter)
     historical_daily_data_request = 'HDT,{0},{1},{2},,,,1\n'.format(instrument, start_date, end_date)
+    historical_tick_data_request = 'HTT,{0},{1},{2},,{3},{4},1,,\n'.format(instrument, start_date, end_date, begin_time_filter, end_time_filter)
     # historical_minute_data_request = 'HTX.{0},30,,,1\n'.format(instrument)
 
     if freq == 'minute':
         log.info("IQFeed historical data request: %s", historical_minute_data_request.rstrip())
     elif freq == 'daily':
         log.info("IQFeed historical data request: %s", historical_daily_data_request.rstrip())
+    elif freq == 'tick':
+        log.info("IQFeed historical data request: %s", historical_tick_data_request.rstrip())
     # Open a streaming socket to the IQFeed daemon
     # with contextlib.closing(socket.create_connection((iqfeed_host, iqfeed_port))) as iqfeed_socket:
     #     iqfeed_socket.settimeout(timeout)
@@ -135,6 +138,9 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
             sock.sendall(historical_minute_data_request)
         elif freq == 'daily':
             sock.sendall(historical_daily_data_request)
+        elif freq == 'tick':
+            log.debug('tick request: ' + historical_tick_data_request)
+            sock.sendall(historical_tick_data_request)
         data = _read_historical_data_socket(sock)
     finally:
         sock.close()
@@ -143,9 +149,12 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
     if len(data):
         for line in data.split('\n'):
             # Returned fields in data are: datetime, high, low, open, close, volume, XXX?, YYYY?
-            log.debug(line)
+            log.debug('line: ' + line)
             try:
-                (datetime_str, high, low, open_, close, volume, _, _) = line.split(',')
+                if freq == 'minute' or freq == 'daily':
+                    (datetime_str, high, low, open_, close, volume, _, _) = line.split(',')
+                elif freq == 'tick':
+                    (datetime_str, last, last_size, volume, bid, ask, ticket_id, _, _, _, _) = line.split(',')
             except ValueError:
                 if 'NO_DATA' in line:
                     log.info('Latest Price, no action required')
@@ -155,15 +164,20 @@ def get_bars(freq, instrument, start_date, end_date, tz, seconds_per_bar,
             if volume.find('.') != -1:
                 raise Exception("Float as a volume, strange...: %s" % line)
 
-            log.debug("%s open=%s high=%s low=%s close=%s volumes=%s", datetime_str, high, low, open_, close, volume)
-            if freq == 'minute':
+            # log.debug("%s open=%s high=%s low=%s close=%s volumes=%s", datetime_str, high, low, open_, close, volume)
+            if freq == 'tick':
+                dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S")
+            elif freq == 'minute':
                 dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S")
             elif freq == 'daily':
                 dt = __create_datetime(datetime_str, format_str="%Y-%m-%d %H:%M:%S").date()
 
-            (open_, high, low, close, volume) = (float(open_), float(high), float(low), float(close), int(volume))
+            if freq == 'minute' or freq == 'daily':
+                (open_, high, low, close, volume) = (float(open_), float(high), float(low), float(close), int(volume))
+                bar = Bar(dt, float(open_), float(high), float(low), float(close), int(volume))
+            elif freq == 'tick':
+                bar = TickBar(dt, float(last), int(last_size), int(volume), float(bid), float(ask), int(ticket_id))
 
-            bar = Bar(dt, float(open_), float(high), float(low), float(close), int(volume))
             bars.append(bar)
 
     log.debug("Returning %d bars", len(bars))
