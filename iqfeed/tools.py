@@ -63,7 +63,7 @@ def bars_to_dateframe(bars, tz):
     return pd.DataFrame.from_records(rows).set_index(['DateTime']).sort_index()
 
 
-def tick_bars_to_dateframe(bars):
+def tick_bars_to_dataframe(bars):
     rows = [{
         'DateTime': bar.datetime,
         'Last':     bar.last,

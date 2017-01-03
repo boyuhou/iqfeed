@@ -53,7 +53,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from iqfeed.download import get_bars
-from iqfeed.tools import get_instruments_from_file, bars_to_dateframe
+from iqfeed.tools import get_instruments_from_file, bars_to_dateframe, tick_bars_to_dataframe
 
 today = datetime.now().today()
 today_str = today.strftime('%Y%m%d')
@@ -129,8 +129,8 @@ def main(ticker, outdir, start_date, end_date, debug, universe, iqfeed_host, iqf
             elif freq == 'tick':
                 bars = get_bars(freq, instrument, process_start_date, end_date, tz, seconds_per_bar, iqfeed_host, iqfeed_port)
                 if len(bars):
-                    new_df = bars_to_dateframe(bars, tz)
-                    pd.concat([price_df, new_df])[['Open', 'High', 'Low', 'Close', 'Volume']].to_csv(instrument_path, date_format=datetime_format)
+                    new_df = tick_bars_to_dataframe(bars)
+                    pd.concat([price_df, new_df])[['Last', 'LastSize', 'Volume', 'Bid', 'Ask', 'TicketID']].to_csv(instrument_path, date_format=datetime_format)
             else:
                 raise TypeError('The freq param is not in a predefined mode')
 
