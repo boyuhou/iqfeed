@@ -70,6 +70,34 @@ The Bar object is a named tuple which holds the Open, High, Low, Close and Volum
 ```python
 IQFeedBar(datetime=datetime.datetime(2015, 1, 2, 9, 30, tzinfo=<DstTzInfo 'US/Eastern' EST-1 day, 19:00:00 STD>), open=112.46, high=112.46, low=112.45, close=112.46, volume=192104)
 ```
+## Run from terminal
+Parameters:
+
+| Parameter | Description |
+| --- | --- |
+| ticker | Ticker Symbol |
+| outdir | Output folder |
+| start_date | Start date |
+| end_date | End date(exclude) |
+| universe | File that contains the universe |
+| freq | minute/daily/tick |
+
+**Examples:**
+
+Get tick data for AAPL at December 14 2016
+```
+$ iqfeed --ticker AAPL --start_date 20161214 --end_date 20161215 --outdir c:\temp --freq tick
+```
+
+Get minute data for AAPL from December 14 to December 16 2016
+```
+$ iqfeed --ticker AAPL --start_date 20161214 --end_date 20161217 --outdir c:\temp --freq minute
+```
+
+Get minute data for all listed in c:\universe.csv file, from December 14 to December 16 2016
+```
+$ iqfeed --universe c:\universe.csv --start_date 20161214 --end_date 20161217 --outdir c:\temp --freq daily
+```
 
 ## License
 [Apache License Version 2.0](http://www.apache.org/licenses/)
